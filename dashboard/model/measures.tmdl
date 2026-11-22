@@ -1,0 +1,139 @@
+createOrReplace
+
+	ref table orders
+
+		measure GMV = CALCULATE(SUMX(order_items, order_items[price] + order_items[freight_value]), orders[status_group] <> "Failed")
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure 'Product Revenue' = CALCULATE(SUM(order_items[price]), orders[status_group] = "Delivered")
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure 'Freight Ratio' = CALCULATE(DIVIDE(SUM(order_items[freight_value]), SUM(order_items[price])), orders[status_group] = "Delivered")
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Total Orders' = COUNTROWS(orders)
+			formatString: #,0
+			displayFolder: Counts
+
+		measure 'Delivered Orders' = CALCULATE(COUNTROWS(orders), orders[status_group] = "Delivered")
+			formatString: #,0
+			displayFolder: Counts
+
+		measure 'Avg Order Value' = DIVIDE([GMV], CALCULATE(COUNTROWS(orders), orders[status_group] <> "Failed"))
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure 'Failed Orders' = CALCULATE(COUNTROWS(orders), orders[status_group] = "Failed")
+			formatString: #,0
+			displayFolder: Counts
+
+		measure 'Failure Rate' = DIVIDE([Failed Orders], [Total Orders])
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Lost GMV' = CALCULATE(SUMX(order_items, order_items[price] + order_items[freight_value]), orders[status_group] = "Failed")
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure 'Timed Orders' = CALCULATE(COUNTROWS(orders), orders[status_group] = "Delivered", NOT ISBLANK(orders[is_late]))
+			formatString: #,0
+			displayFolder: Counts
+
+		measure 'Late Orders' = CALCULATE(COUNTROWS(orders), orders[status_group] = "Delivered", orders[is_late] = TRUE())
+			formatString: #,0
+			displayFolder: Counts
+
+		measure 'On-Time Rate' = 1 - DIVIDE([Late Orders], [Timed Orders])
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Avg Delay Days' = CALCULATE(AVERAGE(orders[delay_days]), orders[status_group] = "Delivered", orders[is_late] = TRUE())
+			formatString: 0.00
+			displayFolder: Service
+
+		measure 'Seller Late Handover Rate' = DIVIDE(COUNTROWS(FILTER(order_items, order_items[late_handover] = TRUE())), COUNTROWS(FILTER(order_items, NOT ISBLANK(order_items[late_handover]))))
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Avg Review' = IF(ISCROSSFILTERED(order_items) || ISCROSSFILTERED(products) || ISCROSSFILTERED(sellers), CALCULATE(AVERAGE(reviews[review_score]), CROSSFILTER(order_items[order_key], orders[order_key], Both)), AVERAGE(reviews[review_score]))
+			formatString: 0.00
+			displayFolder: Service
+
+		measure 'Negative Review Rate' = IF(ISCROSSFILTERED(order_items) || ISCROSSFILTERED(products) || ISCROSSFILTERED(sellers), CALCULATE(DIVIDE(CALCULATE(COUNTROWS(reviews), reviews[review_score] <= 2), COUNTROWS(reviews)), CROSSFILTER(order_items[order_key], orders[order_key], Both)), DIVIDE(CALCULATE(COUNTROWS(reviews), reviews[review_score] <= 2), COUNTROWS(reviews)))
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Avg Review On Time' = CALCULATE(AVERAGE(reviews[review_score]), FILTER(ALL(orders[is_late]), orders[is_late] == FALSE()))
+			formatString: 0.00
+			displayFolder: Service
+
+		measure 'Avg Review Late' = CALCULATE(AVERAGE(reviews[review_score]), orders[is_late] = TRUE())
+			formatString: 0.00
+			displayFolder: Service
+
+		measure 'Late Review Penalty' = [Avg Review On Time] - [Avg Review Late]
+			formatString: 0.00
+			displayFolder: Service
+
+		measure 'Recon Exception Rate' = CALCULATE(DIVIDE(CALCULATE(COUNTROWS(orders), orders[recon_exception] = TRUE()), COUNTROWS(orders)), orders[item_count] > 0, orders[paid_value] > 0)
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Positive Recon Gap' = CALCULATE(SUM(orders[recon_gap]), orders[item_count] > 0, orders[paid_value] > 0, orders[recon_exception] = TRUE(), orders[recon_gap] > 0)
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure 'Voucher Value' = CALCULATE(SUM(payments[payment_value]), payments[payment_type] = "voucher", payments[payment_value] > 0, orders[status_group] <> "Failed")
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure 'Voucher Dependency' = DIVIDE([Voucher Value], CALCULATE(SUM(payments[payment_value]), payments[payment_value] > 0, orders[status_group] <> "Failed"))
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Repeat Rate' = DIVIDE(CALCULATE(COUNTROWS(customer_rfm), customer_rfm[frequency] >= 2), COUNTROWS(customer_rfm))
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Revenue at Risk' = CALCULATE(SUM(customer_rfm[monetary]), customer_rfm[segment] IN {"At Risk", "Can't Lose"})
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure 'Total Leakage' = [Lost GMV] + [Voucher Value] + [Positive Recon Gap] + [Revenue at Risk]
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure 'Leakage % of GMV' = DIVIDE([Total Leakage], [GMV])
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Take Rate' = LOOKUPVALUE(assumptions[value], assumptions[name], "take_rate")
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Platform Contribution' = [Product Revenue] * [Take Rate]
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure Customers = COUNTROWS(customer_rfm)
+			formatString: #,0
+			displayFolder: Counts
+
+		measure 'Leakage Value' = SWITCH(SELECTEDVALUE('Leakage Steps'[Step]), "Gross demand", [GMV] + [Lost GMV], "Lost GMV", -[Lost GMV], "Vouchers", -[Voucher Value], "Payment gaps", -[Positive Recon Gap], "Revenue at risk", -[Revenue at Risk])
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure 'Recovery Rate' = 0.20
+			formatString: 0.0%
+			displayFolder: Rates
+
+		measure 'Recoverable Value' = [Total Leakage] * [Recovery Rate]
+			formatString: R$ #,0
+			displayFolder: Value (BRL)
+
+		measure 'Recoverable Contribution' = [Recoverable Value] * [Take Rate]
+			formatString: R$ #,0
+			displayFolder: Value (BRL)

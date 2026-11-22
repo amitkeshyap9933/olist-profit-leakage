@@ -1,0 +1,37 @@
+DEFINE
+	MEASURE orders[GMV] = CALCULATE(SUMX(order_items, order_items[price] + order_items[freight_value]), orders[status_group] <> "Failed")
+	MEASURE orders[Product Revenue] = CALCULATE(SUM(order_items[price]), orders[status_group] = "Delivered")
+	MEASURE orders[Freight Ratio] = CALCULATE(DIVIDE(SUM(order_items[freight_value]), SUM(order_items[price])), orders[status_group] = "Delivered")
+	MEASURE orders[Total Orders] = COUNTROWS(orders)
+	MEASURE orders[Delivered Orders] = CALCULATE(COUNTROWS(orders), orders[status_group] = "Delivered")
+	MEASURE orders[Avg Order Value] = DIVIDE([GMV], CALCULATE(COUNTROWS(orders), orders[status_group] <> "Failed"))
+	MEASURE orders[Failed Orders] = CALCULATE(COUNTROWS(orders), orders[status_group] = "Failed")
+	MEASURE orders[Failure Rate] = DIVIDE([Failed Orders], [Total Orders])
+	MEASURE orders[Lost GMV] = CALCULATE(SUMX(order_items, order_items[price] + order_items[freight_value]), orders[status_group] = "Failed")
+	MEASURE orders[Timed Orders] = CALCULATE(COUNTROWS(orders), orders[status_group] = "Delivered", NOT ISBLANK(orders[is_late]))
+	MEASURE orders[Late Orders] = CALCULATE(COUNTROWS(orders), orders[status_group] = "Delivered", orders[is_late] = TRUE())
+	MEASURE orders[On-Time Rate] = 1 - DIVIDE([Late Orders], [Timed Orders])
+	MEASURE orders[Avg Delay Days] = CALCULATE(AVERAGE(orders[delay_days]), orders[status_group] = "Delivered", orders[is_late] = TRUE())
+	MEASURE orders[Seller Late Handover Rate] = DIVIDE(COUNTROWS(FILTER(order_items, order_items[late_handover] = TRUE())), COUNTROWS(FILTER(order_items, NOT ISBLANK(order_items[late_handover]))))
+	MEASURE orders[Avg Review] = AVERAGE(reviews[review_score])
+	MEASURE orders[Negative Review Rate] = DIVIDE(CALCULATE(COUNTROWS(reviews), reviews[review_score] <= 2), COUNTROWS(reviews))
+	MEASURE orders[Avg Review On Time] = CALCULATE(AVERAGE(reviews[review_score]), orders[is_late] = FALSE())
+	MEASURE orders[Avg Review Late] = CALCULATE(AVERAGE(reviews[review_score]), orders[is_late] = TRUE())
+	MEASURE orders[Late Review Penalty] = [Avg Review On Time] - [Avg Review Late]
+	MEASURE orders[Recon Exception Rate] = CALCULATE(DIVIDE(CALCULATE(COUNTROWS(orders), orders[recon_exception] = TRUE()), COUNTROWS(orders)), orders[item_count] > 0, orders[paid_value] > 0)
+	MEASURE orders[Positive Recon Gap] = CALCULATE(SUM(orders[recon_gap]), orders[item_count] > 0, orders[paid_value] > 0, orders[recon_exception] = TRUE(), orders[recon_gap] > 0)
+	MEASURE orders[Voucher Value] = CALCULATE(SUM(payments[payment_value]), payments[payment_type] = "voucher", payments[payment_value] > 0, orders[status_group] <> "Failed")
+	MEASURE orders[Voucher Dependency] = DIVIDE([Voucher Value], CALCULATE(SUM(payments[payment_value]), payments[payment_value] > 0, orders[status_group] <> "Failed"))
+	MEASURE orders[Repeat Rate] = DIVIDE(CALCULATE(COUNTROWS(customer_rfm), customer_rfm[frequency] >= 2), COUNTROWS(customer_rfm))
+	MEASURE orders[Revenue at Risk] = CALCULATE(SUM(customer_rfm[monetary]), customer_rfm[segment] IN {"At Risk", "Can't Lose"})
+	MEASURE orders[Total Leakage] = [Lost GMV] + [Voucher Value] + [Positive Recon Gap] + [Revenue at Risk]
+	MEASURE orders[Leakage % of GMV] = DIVIDE([Total Leakage], [GMV])
+	MEASURE orders[Take Rate] = LOOKUPVALUE(assumptions[value], assumptions[name], "take_rate")
+	MEASURE orders[Platform Contribution] = [Product Revenue] * [Take Rate]
+	MEASURE orders[Customers] = COUNTROWS(customer_rfm)
+	MEASURE orders[Leakage Value] = SWITCH(SELECTEDVALUE('Leakage Steps'[Step]), "Gross demand", [GMV] + [Lost GMV], "Lost GMV", -[Lost GMV], "Vouchers", -[Voucher Value], "Payment gaps", -[Positive Recon Gap], "Revenue at risk", -[Revenue at Risk])
+	MEASURE orders[Recovery Rate] = 0.20
+	MEASURE orders[Recoverable Value] = [Total Leakage] * [Recovery Rate]
+	MEASURE orders[Recoverable Contribution] = [Recoverable Value] * [Take Rate]
+EVALUATE
+{ ([GMV], [Product Revenue], [Freight Ratio], [Failure Rate], [Lost GMV], [On-Time Rate], [Avg Delay Days], [Seller Late Handover Rate], [Negative Review Rate], [Avg Review On Time], [Avg Review Late], [Recon Exception Rate], [Positive Recon Gap], [Voucher Dependency], [Repeat Rate], [Revenue at Risk], [Platform Contribution], [Total Leakage]) }
