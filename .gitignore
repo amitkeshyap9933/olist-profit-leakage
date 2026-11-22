@@ -1,0 +1,7 @@
+# raw data is downloaded, not committed
+data/raw/*.csv
+# local secrets and caches
+.env
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
