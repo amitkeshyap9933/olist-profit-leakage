@@ -154,15 +154,6 @@ Built in the Power BI service on a semantic model loaded from this repository.
 
 Measure check (Power BI vs Python ETL): GMV R$ 15,740,217 · Product revenue R$ 13,221,498 · Lost GMV R$ 108,026 · On-time 93.2% · Avg review on time 4.28 / late 2.25 · Revenue at risk R$ 4,534,859 · Total leakage R$ 4,995,839 — all identical.
 
---- | --- |
-| 1 · Executive overview | KPI cards, leakage waterfall (GMV → retained revenue), monthly GMV and on-time % |
-| 2 · Deep-dive diagnostics | Review score by delay, freight by state and category, seller risk, payment gaps, failure trend |
-| 3 · Actions & simulator | Sliders for on-time target, freight cap and win-back rate; recoverable revenue; RFM heatmap; action list |
-
-![Page 1 – Executive overview](dashboard/screenshots/page1_overview.png)
-![Page 2 – Deep-dive diagnostics](dashboard/screenshots/page2_diagnostics.png)
-![Page 3 – Actions & simulator](dashboard/screenshots/page3_simulator.png)
-
 ---
 
 ## Assumptions and limits
