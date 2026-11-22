@@ -1,0 +1,8 @@
+name,value,reason
+freight_flag_ratio,0.30,Freight above 30% of price makes a cheap item uncompetitive
+recon_tolerance,0.01,BRL; covers rounding on instalment splits
+otd_target,0.92,Target share of on-time deliveries
+seller_late_flag,0.15,Seller late-handover rate that triggers review
+min_seller_items,30,Ignore sellers too small to judge
+take_rate,0.10,Stand-in commission rate - not Olist's real fee
+price_outlier_pct,0.995,Percentile above which a price is an outlier
