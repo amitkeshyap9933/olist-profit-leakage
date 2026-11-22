@@ -1,0 +1,34 @@
+rule_id,table,check,rows_affected,action
+DQ16,customers,duplicate key ['customer_id'],0,dropped duplicate rows
+DQ21,sellers,duplicate key ['seller_id'],0,dropped duplicate rows
+DQ22,products,duplicate key ['product_id'],0,dropped duplicate rows
+DQ17,products,missing category,610,filled 'unknown'
+DQ18,products,category with no English name,0,kept Portuguese name - add it to map_category.csv
+DQ01,orders,duplicate key ['order_id'],0,dropped duplicate rows
+DQ02,orders,unparseable date in order_purchase_timestamp,0,set to null
+DQ02,orders,unparseable date in order_approved_at,0,set to null
+DQ02,orders,unparseable date in order_delivered_carrier_date,0,set to null
+DQ02,orders,unparseable date in order_delivered_customer_date,0,set to null
+DQ02,orders,unparseable date in order_estimated_delivery_date,0,set to null
+DQ23,orders,customer_id not found in parent,0,dropped orphan rows
+DQ03,orders,delivered but no delivery date,8,"kept in GMV, excluded from delivery KPIs"
+DQ04,orders,not delivered but has delivery date,6,flagged status_conflict
+DQ05,orders,date sequence broken,1382,"flagged date_sequence_issue, excluded from delay KPIs"
+DQ24,items,"duplicate key ['order_id', 'order_item_id']",0,dropped duplicate rows
+DQ07,items,order_id not found in parent,0,dropped orphan rows
+DQ25,items,product_id not found in parent,0,dropped orphan rows
+DQ26,items,seller_id not found in parent,0,dropped orphan rows
+DQ08,items,price <= 0 or freight < 0,0,dropped
+DQ10,items,high-freight lines (info),41221,flagged high_freight
+DQ09,items,"price above p0.995 (BRL 1,218)",564,flagged is_price_outlier
+DQ11,items,late handover to carrier (info),10423,flagged late_handover
+DQ27,payments,"duplicate key ['order_id', 'payment_sequential']",0,dropped duplicate rows
+DQ28,payments,order_id not found in parent,0,dropped orphan rows
+DQ12,payments,payment_type = not_defined,3,label 'Unknown'
+DQ13,payments,installments < 1,2,set to 1
+DQ14,payments,payment_value <= 0 (info),9,"kept for reconciliation, excluded from payment mix"
+DQ20,reviews,score missing or outside 1-5,0,dropped
+DQ29,reviews,order_id not found in parent,0,dropped orphan rows
+DQ19,reviews,more than one review per order,559,kept latest by review_answer_timestamp
+DQ06,orders,orders with no items,775,excluded from revenue
+DQ15,orders,reconciliation exceptions (info),366,flagged recon_exception
