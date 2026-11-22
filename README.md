@@ -2,9 +2,9 @@
 
 **Where does a marketplace lose money between checkout and a repeat customer — and what should it fix first?**
 
-An end-to-end analytics project on ~100k real orders from Olist, a Brazilian e-commerce marketplace (2016–2018). The pipeline goes from an Excel data audit to a Python ETL, a PostgreSQL warehouse, eight analytical SQL queries and a three-page Power BI dashboard.
+An end-to-end analytics project on ~100k real orders from Olist, a Brazilian e-commerce marketplace (2016–2018). The pipeline goes from an Excel data audit to a Python ETL, a PostgreSQL warehouse, eight analytical SQL queries and a two-page Power BI dashboard.
 
-![Python](https://img.shields.io/badge/Python-3.11-blue) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791) ![Power BI](https://img.shields.io/badge/Power%20BI-Desktop-F2C811) ![Excel](https://img.shields.io/badge/Excel-Power%20Query-217346)
+![Python](https://img.shields.io/badge/Python-3.11-blue) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791) ![Power BI](https://img.shields.io/badge/Power%20BI-Service-F2C811) ![Excel](https://img.shields.io/badge/Excel-Power%20Query-217346)
 
 ---
 
@@ -33,7 +33,7 @@ flowchart LR
     C -->|cleaned tables| D[(PostgreSQL 16<br/>schema olist)]
     C -->|KPI + DQ report| E[etl_summary_report.xlsx]
     D --> F[SQL analysis<br/>8 queries]
-    D --> G[Power BI<br/>3-page dashboard]
+    C -->|compact gz tables| G[Power BI Service<br/>semantic model + 2-page report]
 ```
 
 ---
@@ -53,9 +53,10 @@ olist-profit-leakage/
 │   ├── 01_schema.sql         # DDL: 9 tables, PK/FK, CHECK constraints, indexes
 │   └── 02_analysis.sql       # 8 business queries (CTEs, window functions, GROUPING SETS)
 ├── notebooks/                # exploratory notebook (optional)
+├── data/processed/           # compact gzipped tables that feed the Power BI model
 ├── dashboard/
-│   ├── olist_profit_leakage.pbix
-│   └── screenshots/          # page1_overview.png, page2_diagnostics.png, page3_simulator.png
+│   ├── model/                # measures.tmdl (34 DAX measures) + measures_query.dax
+│   └── screenshots/          # 01_executive_overview.png, 02_diagnostics.png
 ├── outputs/
 │   ├── etl_summary_report.xlsx
 │   └── dq_log.csv
@@ -87,7 +88,7 @@ python src/etl_pipeline.py
 psql -d olist_dw -f sql/02_analysis.sql
 ```
 
-Open `dashboard/olist_profit_leakage.pbix` and point the PostgreSQL source to your server (Transform data → Data source settings).
+The Power BI model reads `data/processed/*.csv.gz` straight from this repository (Web connector, anonymous access, `Binary.Decompress` + `Csv.Document`), so it refreshes in the Power BI service without a gateway. To rebuild it: create a semantic model from the nine tables, add the relationships, then apply `dashboard/model/measures.tmdl` in TMDL view.
 
 ---
 
@@ -97,7 +98,7 @@ Open `dashboard/olist_profit_leakage.pbix` and point the PostgreSQL source to yo
 2. **Python ETL** — one function per table, every fix logged to `dq_log.csv` with its rule ID. Feature engineering: delay days and buckets, freight ratio, high-freight and late-handover flags, order-level reconciliation (paid vs billed), RFM per real customer (`customer_unique_id`).
 3. **PostgreSQL** — normalised schema with keys, constraints and indexes; the loader verifies row counts after every run.
 4. **SQL analysis** — eight queries, one per business question.
-5. **Power BI** — executive overview, diagnostics with drill-through, and a what-if simulator.
+5. **Power BI** — a star-style semantic model (7 relationships, 34 DAX measures with formats and display folders) and a two-page report. Every headline measure was checked against the Python KPI output before the report was built.
 
 ### Data quality found
 
@@ -141,8 +142,19 @@ Other queries: freight leakage by state with `RANK()` against the national avera
 
 ## Dashboard
 
-| Page | Purpose |
+Built in the Power BI service on a semantic model loaded from this repository.
+
+| Page | What it shows |
 | --- | --- |
+| 1 · Executive overview | GMV, total leakage, leakage % of GMV, on-time rate and revenue at risk; leakage waterfall from gross demand to net; monthly GMV against on-time rate; customers by RFM segment |
+| 2 · Diagnostics | Freight cost as % of price by state; review score by delivery delay; on-time rate by region; category scorecard (GMV, freight ratio, negative reviews, lost GMV) |
+
+![Page 1 – Executive overview](dashboard/screenshots/01_executive_overview.png)
+![Page 2 – Diagnostics](dashboard/screenshots/02_diagnostics.png)
+
+Measure check (Power BI vs Python ETL): GMV R$ 15,740,217 · Product revenue R$ 13,221,498 · Lost GMV R$ 108,026 · On-time 93.2% · Avg review on time 4.28 / late 2.25 · Revenue at risk R$ 4,534,859 · Total leakage R$ 4,995,839 — all identical.
+
+--- | --- |
 | 1 · Executive overview | KPI cards, leakage waterfall (GMV → retained revenue), monthly GMV and on-time % |
 | 2 · Deep-dive diagnostics | Review score by delay, freight by state and category, seller risk, payment gaps, failure trend |
 | 3 · Actions & simulator | Sliders for on-time target, freight cap and win-back rate; recoverable revenue; RFM heatmap; action list |
